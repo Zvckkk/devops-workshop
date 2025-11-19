@@ -1,0 +1,22 @@
+
+# -----------------------------------------
+# BAD PRACTICES DOCKERFILE
+# Builds a simple C++ Hello World app
+# -----------------------------------------
+
+# ❌ Bloated base image (large and unnecessary)
+FROM ubuntu:latest
+
+# ❌ No WORKDIR, everything dumped in root
+COPY . /root/
+
+# ❌ Hardcoding secrets (NEVER DO THIS)
+ENV API_KEY=123456789
+    
+# ❌ Single-stage build (huge image, includes compiler)
+RUN apt-get update && apt-get install -y g++ \
+    && g++ -o app /root/main.cpp
+
+# ❌ Runs as root (default)
+# ❌ ENTRYPOINT and CMD misused (only CMD, no ENTRYPOINT)
+CMD ["./hello"]

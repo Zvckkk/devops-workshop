@@ -1,0 +1,40 @@
+
+# -----------------------------------------
+# GOOD PRACTICES DOCKERFILE
+# Builds a simple C++ Hello World app
+# -----------------------------------------
+
+# Stage 1: Build the application
+
+# Minimal base image for building C++
+FROM gcc:13 AS builder  
+# Set working directory
+WORKDIR /app          
+# Copy only necessary files  
+COPY main.cpp .         
+# Compile with optimization
+RUN g++ -O2 -o app main.cpp  
+
+# Stage 2: Runtime image
+# ✅ Minimal runtime image
+FROM debian:bookworm-slim  
+WORKDIR /app
+# Multi-stage build reduces image size
+COPY --from=builder /app/app .  
+# ✅ Create non-root user for security
+RUN useradd -m appuser
+USER appuser
+
+# ✅ Use ENTRYPOINT for executable, CMD for optional args
+ENTRYPOINT ["./app"]
+CMD []
+
+# ✅ Documentation included
+# This Dockerfile demonstrates best practices:
+# - Minimal base images
+# - Multi-stage builds
+# - Layer caching
+# - WORKDIR usage
+# - ENTRYPOINT and CMD separation
+# - No hardcoded secrets
+# - Runs as non-root user
