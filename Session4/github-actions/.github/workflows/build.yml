@@ -1,0 +1,33 @@
+# Build and Package workflow - creates an artifact
+name: Build and Package
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Create distribution
+        run: |
+          mkdir -p dist
+          cp app.py dist/
+          cp requirements.txt dist/
+          echo "Build completed at $(date)" > dist/BUILD_INFO.txt
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: python-app
+          path: dist/

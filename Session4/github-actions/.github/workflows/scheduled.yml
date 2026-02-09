@@ -1,0 +1,24 @@
+# Schedule workflow - runs on a schedule (cron)
+name: Scheduled Check
+
+on:
+  schedule:
+    - cron: '0 2 * * *'  # Runs daily at 2 AM UTC
+
+jobs:
+  scheduled_check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Run health check
+        run: |
+          echo "Health check running..."
+          python -c "import app; print('App imports successfully')"
+          echo "Health check passed!"
