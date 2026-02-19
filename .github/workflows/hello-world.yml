@@ -3,16 +3,16 @@ name: Hello World CI
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
   pull_request:
-    branches: [ main ]
+    branches: [main]
 
 jobs:
   hello:
     runs-on: ubuntu-latest
     steps:
       - name: Say Hello
-        run: echo "Hello from GitHub Actions!"
+        run: echo "Hello from GitHub Actions!, Ace was here"
 
       - name: Print Environment
         run: |
