@@ -18,9 +18,4 @@ chmod +x ./cloudsmith.pyz
 sudo mv ./cloudsmith.pyz /usr/local/bin/cloudsmith
 
 # Verify installation
-if command -v cloudsmith >/dev/null 2>&1; then
-    echo "Success: Cloudsmith CLI version $(cloudsmith --version) is installed."
-else
-    echo "Error: Installation failed."
-    exit 1
-fi
+cloudsmith --version
