@@ -1,10 +1,20 @@
+#!/usr/bin/env bash
+set -e
+echo "=== CloudSmith CLI Setup ==="
+
 # Update system and install dependencies
-sudo apt update
-sudo apt install -y curl jq
+sudo apt-get update
+sudo apt-get install -y curl jq
 
 # Install Cloudsmith CLI
-curl -1sLf 'https://dl.cloudsmith.io/public/cloudsmith/cli/setup.deb.sh' | sudo -E bash
-sudo apt install -y cloudsmith-cli
+python3 -m venv .cloudsmith-env
+source .cloudsmith-env/bin/activate
+pip install --upgrade cloudsmith-cli
 
 # Verify installation
-cloudsmith --version
+if command -v cloudsmith >/dev/null 2>&1; then
+    echo "Success: Cloudsmith CLI version $(cloudsmith --version) is installed."
+else
+    echo "Error: Installation failed."
+    exit 1
+fi
