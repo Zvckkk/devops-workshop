@@ -52,12 +52,12 @@ wsl
 
 This workshop includes a unified setup script that can install various DevOps tools:
 
-| Tool | Command | Description |
-|------|---------|-------------|
-| **Docker** | `./setup.sh docker` | Container runtime and management |
-| **Ansible** | `./setup.sh ansible` | Configuration management and automation |
-| **K0s** | `./setup.sh k0s` | Lightweight Kubernetes distribution |
-| **CloudSmith** | `./setup.sh cloudsmith` | Package repository management |
+| Tool           | Command                 | Description                             |
+| -------------- | ----------------------- | --------------------------------------- |
+| **Docker**     | `./setup.sh docker`     | Container runtime and management        |
+| **Ansible**    | `./setup.sh ansible`    | Configuration management and automation |
+| **K0s**        | `./setup.sh k0s`        | Lightweight Kubernetes distribution     |
+| **CloudSmith** | `./setup.sh cloudsmith` | Package repository management           |
 
 ## How to Run the Setup Script
 
@@ -100,6 +100,7 @@ chmod +x setup.sh
 ## What the Scripts Do
 
 Each setup script will typically:
+
 - ✅ Verify you're running in WSL (where applicable)
 - ✅ Update system packages
 - ✅ Install prerequisites and dependencies
@@ -115,10 +116,12 @@ Each setup script will typically:
 - [Docker Documentation](https://docs.docker.com/)
 - [Ansible Documentation](https://docs.ansible.com/)
 - [Kubernetes Documentation](https://kubernetes.io/docs/)
+- [Cloudsmith Documentation](https://help.cloudsmith.io/docs/welcome-to-cloudsmith-docs)
 
 ## Next Steps
 
 After successful installation of your chosen tools, you can:
+
 - Explore the individual tool documentation
 - Follow along with workshop exercises
 - Build and deploy applications using these DevOps tools
@@ -126,4 +129,3 @@ After successful installation of your chosen tools, you can:
 - Manage infrastructure as code
 
 Happy learning!
-
