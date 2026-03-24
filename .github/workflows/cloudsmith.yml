@@ -30,7 +30,7 @@ jobs:
       - name: Build artifact (ELF + HEX)
         run: |
           mkdir -p dist
-          make -f session5.mk all
+          make -f Session5/session5.mk all
 
       - name: Upload ELF artifact to Cloudsmith
         env:
