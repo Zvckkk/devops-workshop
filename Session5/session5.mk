@@ -9,7 +9,8 @@ all: build prepare_hex
 
 # Build the ELF file
 build:
-	$(CC) $(CFLAGS) main.c -o $(DIST_DIR)/$(TARGET).elf
+	mkdir -p $(DIST_DIR)
+	$(CC) $(CFLAGS) Session5/main.c -o $(DIST_DIR)/$(TARGET).elf
 
 # Convert ELF to HEX
 prepare_hex:
