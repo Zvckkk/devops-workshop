@@ -127,6 +127,8 @@ Cloudsmith supports packing using the `push/upload` command for multiple formats
 Command:
 
 ```bash
+make -f Session/session5.mk all
+
 cloudsmith push <format> <OWNER>/<REPOSITORY> <package_file>
 ```
 
@@ -191,6 +193,8 @@ jobs:
           CLOUDSMITH_API_KEY: ${{ secrets.CLOUDSMITH_API_KEY }}
 ```
 
+Inner-Source Shared-Actions:
+
 Cloudsmith Documentations
 
 ```
@@ -202,6 +206,7 @@ https://help.cloudsmith.io/docs/cli
 
 ```
 
+```
 https://hub.analog.com/@/tools/cloudsmith/references/faq/
 
 ```
@@ -209,9 +214,6 @@ https://hub.analog.com/@/tools/cloudsmith/references/faq/
 Inner source Shared-Actions-docs
 
 ```
-
 https://hub.analog.com/catalog/default/component/shared-actions-docs/docs/
-
-```
 
 ```
