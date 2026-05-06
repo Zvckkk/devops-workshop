@@ -1,0 +1,178 @@
+version: "3.9"
+
+# Monitoring Stack: Collect → Store → Visualize
+# Quick Setup: docker-compose up -d
+# Access Grafana: http://localhost:3000 (admin/admin)
+
+services:
+  # ============================================
+  # LAYER 1: DATA COLLECTION
+  # ============================================
+  node-exporter:
+    image: prom/node-exporter:v1.8.2
+    container_name: node-exporter
+    restart: unless-stopped
+
+    # Expose metrics on port 9100
+    ports:
+      - "9100:9100"
+
+    # Mount host filesystem to collect system metrics
+    # Works perfectly in WSL2 environment
+    volumes:
+      - /:/host:ro,rslave
+
+    # Access host PID namespace for accurate process metrics
+    pid: host
+
+    # Configure paths for metrics collection
+    command:
+      - --path.rootfs=/host
+      - --path.procfs=/host/proc
+      - --path.sysfs=/host/sys
+      - --collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc|run|var/lib/docker/.+)($|/)
+
+    # Resource limits (good practice for 16GB RAM)
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+          cpus: '0.25'
+
+    # Health check to know when ready
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9100/"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+
+  # ============================================
+  # LAYER 2: DATA STORAGE (Time-Series DB)
+  # ============================================
+  prometheus:
+    image: prom/prometheus:v2.53.0
+    container_name: prometheus
+    restart: unless-stopped
+
+    # Expose Prometheus UI on port 9090
+    ports:
+      - "9090:9090"
+
+    # Mount config file and data volume
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+
+    # Configuration options
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --web.enable-lifecycle  # Allow config reload without restart
+      - --storage.tsdb.retention.time=15d  # Keep 15 days of data
+
+    # Wait for node-exporter to be available
+    depends_on:
+      - node-exporter
+
+    # Resource limits (2GB is plenty for short-term metrics)
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '1.0'
+        reservations:
+          memory: 512M
+
+    # Health check to know when ready to scrape
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9090/-/healthy"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  # ============================================
+  # LAYER 3: DATA VISUALIZATION (Dashboard)
+  # ============================================
+  grafana:
+    image: grafana/grafana:11.0.0
+    container_name: grafana
+    restart: unless-stopped
+
+    # Expose Grafana UI on port 3000 (accessible from network)
+    # Changed from 127.0.0.1:3000:3000 for workshop accessibility
+    ports:
+      - "3000:3000"
+
+    # Persist dashboards and data sources
+    volumes:
+      - grafana_data:/var/lib/grafana
+
+    # Workshop-optimized configuration
+    environment:
+      # Default admin credentials (change in production!)
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+
+      # Workshop settings for smooth experience
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_USERS_AUTO_ASSIGN_ORG_ROLE: "Admin"
+      GF_AUTH_DISABLE_LOGIN_FORM: "false"
+
+      # Skip password change prompt for workshop
+      GF_AUTH_DISABLE_SIGNOUT_MENU: "false"
+
+      # Better logging for troubleshooting
+      GF_LOG_LEVEL: info
+
+      # Auto-install useful plugins for demo
+      GF_INSTALL_PLUGINS: grafana-clock-panel,grafana-piechart-panel
+
+    # Wait for Prometheus to be available
+    depends_on:
+      - prometheus
+
+    # Resource limits (512MB is plenty for Grafana)
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+        reservations:
+          memory: 256M
+
+    # Health check to know when UI is ready
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+# ============================================
+# PERSISTENT VOLUMES
+# ============================================
+volumes:
+  # Stores Prometheus time-series data
+  # Survives container restarts
+  prometheus_data:
+
+  # Stores Grafana dashboards and configuration
+  # Survives container restarts
+  grafana_data:
+
+# ============================================
+# QUICK COMMANDS FOR WORKSHOP
+# ============================================
+# Start:     docker-compose up -d
+# Check:     docker-compose ps
+# Logs:      docker-compose logs -f
+# Stop:      docker-compose down
+# Clean:     docker-compose down -v
+#
+# Access URLs:
+# - Grafana:        http://localhost:3000 (admin/admin)
+# - Prometheus:     http://localhost:9090
+# - Node Exporter:  http://localhost:9100/metrics
+# ============================================
