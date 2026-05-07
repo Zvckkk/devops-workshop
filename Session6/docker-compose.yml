@@ -47,8 +47,36 @@ services:
       retries: 3
       start_period: 5s
 
+  promtail:
+    image: grafana/promtail:2.9.8
+    container_name: promtail
+    restart: unless-stopped
+
+    # Mount config file and host logs
+    volumes:
+      - ./promtail/promtail-config.yml:/etc/promtail/promtail-config.yml:ro
+      - /var/log:/var/log:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+
+    # Configuration options
+    command:
+      - -config.file=/etc/promtail/promtail-config.yml
+
+    # Access host PID namespace to read dmesg
+    pid: host
+
+    # Privileged mode needed for reading dmesg
+    privileged: true
+
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.25'
+
   # ============================================
-  # LAYER 2: DATA STORAGE (Time-Series DB)
+  # LAYER 2: DATA STORAGE
   # ============================================
   prometheus:
     image: prom/prometheus:v2.53.0
@@ -87,6 +115,41 @@ services:
     # Health check to know when ready to scrape
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9090/-/healthy"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  loki:
+    image: grafana/loki:2.9.8
+    container_name: loki
+    restart: unless-stopped
+
+    # Expose Loki API on port 3100
+    ports:
+      - "3100:3100"
+
+    # Mount config file and data volume
+    volumes:
+      - ./loki/loki-config.yml:/etc/loki/loki-config.yml:ro
+      - loki_data:/loki
+
+    # Configuration options
+    command:
+      - -config.file=/etc/loki/loki-config.yml
+
+    # Resource limits (1GB for log storage)
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '0.5'
+        reservations:
+          memory: 256M
+
+    # Health check to know when ready
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3100/ready"]
       interval: 10s
       timeout: 5s
       retries: 3
@@ -162,6 +225,10 @@ volumes:
   # Survives container restarts
   grafana_data:
 
+  # Stores Loki log data
+  # Survives container restarts
+  loki_data:
+
 # ============================================
 # QUICK COMMANDS FOR WORKSHOP
 # ============================================
@@ -174,5 +241,6 @@ volumes:
 # Access URLs:
 # - Grafana:        http://localhost:3000 (admin/admin)
 # - Prometheus:     http://localhost:9090
+# - Loki:           http://localhost:3100
 # - Node Exporter:  http://localhost:9100/metrics
 # ============================================
