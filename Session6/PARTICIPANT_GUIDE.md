@@ -1,8 +1,13 @@
-# Grafana & Monitoring Stack - Participant Guide
+# Grafana & Observability Stack - Participant Guide
 
 ## Workshop Overview
 
-This hands-on guide walks you through setting up a complete monitoring stack. Follow each section in order, running the commands as you go.
+This hands-on guide walks you through setting up a complete observability stack with both **metrics** and **logs**. You'll deploy:
+- **Metrics Collection**: Prometheus + Node Exporter
+- **Log Aggregation**: Loki + Promtail (including kernel/dmesg logs)
+- **Visualization**: Grafana (unified dashboards)
+
+Follow each section in order, running the commands as you go.
 
 ---
 
@@ -163,10 +168,13 @@ cat docker-compose.yml
 ```
 
 **What to notice**:
-- Three services: node-exporter, prometheus, grafana
-- Port mappings: 9100, 9090, 3000
+- Five services: node-exporter, promtail, prometheus, loki, grafana
+- Port mappings: 9100 (node-exporter), 9090 (prometheus), 3100 (loki), 3000 (grafana)
 - Volumes for data persistence
-- Service dependencies
+- Service dependencies and architecture layers:
+  - **Layer 1 - Data Collection**: node-exporter (metrics), promtail (logs)
+  - **Layer 2 - Data Storage**: prometheus (metrics DB), loki (logs DB)
+  - **Layer 3 - Visualization**: grafana (dashboards)
 
 ### Step 2.3: Start the Monitoring Stack
 
@@ -180,17 +188,21 @@ docker-compose up -d
 - Reads `docker-compose.yml`
 - Creates a network for service communication
 - Starts containers in dependency order:
-  1. Node Exporter (no dependencies)
+  1. Node Exporter & Promtail (data collectors)
   2. Prometheus (depends on node-exporter)
-  3. Grafana (depends on prometheus)
+  3. Loki (stores logs from promtail)
+  4. Grafana (depends on prometheus)
 
 **Expected output**:
 ```
 Creating network "monitoring_default" with the default driver
 Creating volume "monitoring_prometheus_data" with default driver
 Creating volume "monitoring_grafana_data" with default driver
+Creating volume "monitoring_loki_data" with default driver
 Creating node-exporter ... done
+Creating promtail      ... done
 Creating prometheus    ... done
+Creating loki          ... done
 Creating grafana       ... done
 ```
 
@@ -209,8 +221,10 @@ docker-compose ps
       Name                    Command               State           Ports
 ----------------------------------------------------------------------------------
 grafana          /run.sh                          Up      0.0.0.0:3000->3000/tcp
+loki             /usr/bin/loki ...                Up      0.0.0.0:3100->3100/tcp
 node-exporter    /bin/node_exporter ...           Up      0.0.0.0:9100->9100/tcp
 prometheus       /bin/prometheus ...              Up      0.0.0.0:9090->9090/tcp
+promtail         /usr/bin/promtail ...            Up
 ```
 
 **Verify**:
@@ -228,6 +242,8 @@ docker-compose logs
 # Or view logs for a specific service
 docker-compose logs grafana
 docker-compose logs prometheus
+docker-compose logs loki
+docker-compose logs promtail
 docker-compose logs node-exporter
 
 # Follow logs in real-time
@@ -236,7 +252,9 @@ docker-compose logs -f
 
 **What to look for**:
 - **node-exporter**: "Listening on :9100"
+- **promtail**: "Starting Promtail"
 - **prometheus**: "Server is ready to receive web requests"
+- **loki**: "Server is ready"
 - **grafana**: "HTTP Server Listen"
 
 **Tip**: Press `Ctrl+C` to stop following logs.
@@ -288,6 +306,47 @@ Try a simple query:
 
 **Expected result**: You should see time-series data for CPU usage.
 
+### Step 2.9: Verify Loki
+
+Check that Loki is ready to receive logs:
+
+**Browser**: Open http://localhost:3100/ready
+
+**Expected output**: "ready" message
+
+**Or via curl**:
+```bash
+curl http://localhost:3100/ready
+```
+
+**Check Loki metrics**:
+```bash
+curl http://localhost:3100/metrics | grep loki
+```
+
+### Step 2.10: Verify Promtail is Sending Logs
+
+Check that Promtail is collecting and sending logs to Loki:
+
+**Check Promtail metrics**:
+```bash
+curl http://localhost:9080/metrics | grep promtail
+```
+
+**Query Loki for recent logs**:
+```bash
+curl -G -s "http://localhost:3100/loki/api/v1/query" \
+  --data-urlencode 'query={job="syslog"}' \
+  | head -50
+```
+
+**Expected result**: You should see JSON output with log entries from your system.
+
+**What's being collected**:
+- **Kernel logs (dmesg)**: From `/var/log/syslog` and `/var/log/kern.log`
+- **System logs**: General syslog messages
+- **Docker container logs**: All container logs
+
 ---
 
 ## Part 3: Configuring Grafana
@@ -325,7 +384,26 @@ Docker Compose creates a network where services can reach each other by name. In
 - Red error? Check prometheus is running: `docker-compose ps`
 - Timeout? Check network: `docker network inspect monitoring_default`
 
-### Step 3.3: Import Node Exporter Dashboard
+### Step 3.3: Add Loki Data Source
+
+Configure Grafana to query logs from Loki:
+
+1. Click **"Connections"** on the left sidebar
+2. Select **"Data Sources"**
+3. Click **"Add data source"**
+4. Choose **"Loki"**
+5. Configure:
+   - **Name**: `Loki` (default is fine)
+   - **URL**: `http://loki:3100`
+   - **Access**: `Server (default)`
+6. Scroll down and click **"Save & Test"**
+
+**Expected result**: Green checkmark with "Data source connected and labels found"
+
+**Why http://loki:3100?**
+Similar to Prometheus, Docker Compose allows services to communicate using container names. Grafana can reach Loki at `loki:3100` within the Docker network.
+
+### Step 3.4: Import Node Exporter Dashboard
 
 Get instant monitoring by importing a pre-built dashboard:
 
@@ -347,7 +425,59 @@ Get instant monitoring by importing a pre-built dashboard:
 
 **Time to explore**: Spend 2-3 minutes exploring different panels!
 
-### Step 3.4: Understanding the Dashboard
+### Step 3.5: Explore Logs with Loki
+
+Now let's explore system logs using Loki:
+
+1. Click **"Explore"** (compass icon) on the left sidebar
+2. At the top, select **"Loki"** as the data source
+3. Try these LogQL queries:
+
+**View all kernel logs**:
+```logql
+{job="kernel"}
+```
+
+**View system logs**:
+```logql
+{job="syslog"}
+```
+
+**View Docker container logs**:
+```logql
+{job="docker"}
+```
+
+**Filter for errors**:
+```logql
+{job="syslog"} |= "error"
+```
+
+**Filter for specific service (e.g., docker)**:
+```logql
+{job="syslog", service="dockerd"}
+```
+
+**Count log lines per minute**:
+```logql
+sum(count_over_time({job="syslog"}[1m]))
+```
+
+**Explore the interface**:
+- Click on a log line to see full details
+- Use the time picker to zoom into specific time ranges
+- Try the "Live" button for real-time log streaming
+
+**Tip**: Generate some activity (e.g., restart a container) and watch the logs in real-time!
+
+```bash
+# In another terminal, restart a container
+docker restart prometheus
+
+# Watch the logs appear in Grafana Explore
+```
+
+### Step 3.6: Understanding the Dashboard
 
 Key panels to explore:
 
@@ -369,7 +499,7 @@ Key panels to explore:
 - **Traffic**: Bytes sent/received
 - **Network Traffic**: Per interface
 
-### Step 3.5: Generate Some Load (Optional)
+### Step 3.7: Generate Some Load (Optional)
 
 Want to see the graphs move? Generate some CPU load:
 
@@ -386,7 +516,7 @@ docker run --rm -it containerstack/cpustress --cpu 2 --timeout 30s
 
 ## Part 4: Creating a Custom Dashboard
 
-### Step 4.1: Create New Dashboard
+### Step 4.1: Create New Dashboard (Metrics)
 
 1. In Grafana, click **"+"** → **"New dashboard"**
 2. Click **"+ Add Visualization"**
@@ -423,7 +553,26 @@ docker run --rm -it containerstack/cpustress --cpu 2 --timeout 30s
 2. Name: "My First Dashboard"
 3. Click **"Save"**
 
-**Congratulations!** You've created your first custom dashboard!
+**Congratulations!** You've created your first custom metrics dashboard!
+
+### Step 4.5: Add a Logs Panel (Optional)
+
+Add a logs panel to your dashboard:
+
+1. Click **"Add"** → **"Visualization"**
+2. At the top, switch data source to **"Loki"**
+3. Click **"Code"** and enter this query:
+   ```logql
+   {job="syslog"}
+   ```
+4. On the right panel:
+   - Change **Visualization** to "Logs"
+   - **Title**: "System Logs"
+   - **Options**: Enable "Show Time", "Show Labels"
+5. Click **"Apply"**
+6. **Save** the dashboard
+
+**Result**: Now you have both metrics and logs in one dashboard!
 
 ---
 
@@ -446,6 +595,8 @@ docker-compose down -v
 docker rmi grafana/grafana:11.0.0
 docker rmi prom/prometheus:v2.53.0
 docker rmi prom/node-exporter:v1.8.2
+docker rmi grafana/loki:2.9.8
+docker rmi grafana/promtail:2.9.8
 ```
 
 **Verify cleanup**:
@@ -463,9 +614,11 @@ docker images
 
 - **Grafana**: http://localhost:3000 (admin/admin)
 - **Prometheus**: http://localhost:9090
+- **Loki**: http://localhost:3100
 - **Node Exporter**: http://localhost:9100/metrics
+- **Promtail**: http://localhost:9080/metrics
 
-### Useful PromQL Queries
+### Useful PromQL Queries (Metrics)
 
 ```promql
 # CPU usage
@@ -481,15 +634,45 @@ docker images
 rate(node_network_receive_bytes_total[5m])
 ```
 
+### Useful LogQL Queries (Logs)
+
+```logql
+# All kernel/dmesg logs
+{job="kernel"}
+
+# All system logs
+{job="syslog"}
+
+# Docker container logs
+{job="docker"}
+
+# Filter for errors in syslog
+{job="syslog"} |= "error"
+
+# Filter for specific service
+{job="syslog", service="dockerd"}
+
+# Exclude certain log levels
+{job="syslog"} != "debug"
+
+# Count error logs per minute
+sum(count_over_time({job="syslog"} |= "error" [1m]))
+
+# Top services by log volume
+topk(5, sum by (service) (count_over_time({job="syslog"}[5m])))
+```
+
 ---
 
 ## Next Steps
 
 1. **Explore more dashboards**: Visit https://grafana.com/grafana/dashboards/
-2. **Learn PromQL**: https://prometheus.io/docs/prometheus/latest/querying/basics/
-3. **Set up alerts**: Create notification rules in Grafana
-4. **Add more exporters**: Monitor databases, web servers, etc.
-5. **Customize dashboards**: Build dashboards for your specific needs
+2. **Learn PromQL and LogQL**: Master both metric and log query languages
+3. **Set up alerts**: Create notification rules in Grafana for metrics and logs
+4. **Add more exporters**: Monitor databases, web servers, applications
+5. **Customize log collection**: Configure Promtail to collect application-specific logs
+6. **Build unified dashboards**: Combine metrics and logs for comprehensive observability
+7. **Explore log patterns**: Use LogQL pattern matching and metric extraction
 
 ---
 
@@ -497,8 +680,10 @@ rate(node_network_receive_bytes_total[5m])
 
 - **Grafana Documentation**: https://grafana.com/docs/
 - **Prometheus Documentation**: https://prometheus.io/docs/
+- **Loki Documentation**: https://grafana.com/docs/loki/latest/
 - **Node Exporter**: https://github.com/prometheus/node_exporter
 - **PromQL Basics**: https://prometheus.io/docs/prometheus/latest/querying/basics/
+- **LogQL Basics**: https://grafana.com/docs/loki/latest/logql/
 - **Dashboard Examples**: https://grafana.com/grafana/dashboards/
 
 ---
@@ -507,9 +692,11 @@ rate(node_network_receive_bytes_total[5m])
 
 You've successfully:
 - ✅ Run Grafana as a standalone container
-- ✅ Deployed a complete monitoring stack
-- ✅ Configured Prometheus as a data source
+- ✅ Deployed a complete monitoring stack (metrics + logs)
+- ✅ Configured Prometheus as a data source (metrics)
+- ✅ Configured Loki as a data source (logs)
 - ✅ Imported and explored a pre-built dashboard
+- ✅ Queried logs with LogQL
 - ✅ Created your own custom dashboard
 
 **Keep experimenting and happy monitoring!**
